@@ -12,7 +12,7 @@ from typing import List
 #from pyspark.sql.functions import lit
 import time
 
- 
+url = "https://github.com/jordanavery92-javery3/cse6242-recipe-ingredient-app/releases/download/v1.0/en.openfoodfacts.org.products.tsv"
 
 # !apt-get install openjdk-8-jdk-headless -qq > /dev/null
 # #Check this site for the latest download link https://www.apache.org/dyn/closer.lua/spark/spark-3.2.1/spark-3.2.1-bin-hadoop3.2.tgz
@@ -53,7 +53,7 @@ import time
  # No more pyspark, findspark, or os.environ imports needed!
 
 @st.cache_data
-def load_data(file_path):
+def load_data(url):
     # Simulate a long-running data loading process
     time.sleep(2)
     
@@ -64,7 +64,7 @@ def load_data(file_path):
     
     # Read with Pandas instead of Spark
     df = pd.read_csv(
-        file_path,
+        url,
         sep='\t',
         escapechar='"',
         usecols=selected_columns, # Only load columns we need
@@ -233,8 +233,7 @@ import altair as alt
 
 if st.button('Submit'):
     
-  file_path = '6242/en.openfoodfacts.org.products.tsv'
-  df = load_data(file_path)
+  df = load_data(url)
   #df = spark.createDataFrame(df)
 
   for a in selected_allergies:
@@ -320,4 +319,5 @@ if st.button('Submit'):
  
 # sort based on preferences and show top 3 best options 
 # show graphs comparing them
+
  
