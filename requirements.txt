@@ -1,5 +1,5 @@
 streamlit
 pandas
 recipe-scrapers
-ingredient-parser
+ingredient-parser-nlp
 altair
