@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
+import time
+import csv
 from recipe_scrapers import scrape_me
 from ingredient_parser import parse_ingredient
- 
-import time
 
 url = "https://github.com/jordanavery92-javery3/cse6242-recipe-ingredient-app/releases/download/v1.0/en.openfoodfacts.org.products.tsv"
 
@@ -59,7 +60,7 @@ def load_data(url):
     df = pd.read_csv(
         url,
         sep='\t',
-        escapechar='"',
+        quoting=csv.QUOTE_NONE
         usecols=selected_columns, # Only load columns we need
         low_memory=False,
         on_bad_lines='skip' # Handles potential multiline issues
@@ -314,4 +315,5 @@ if st.button('Submit'):
 # show graphs comparing them
 
  
+
 
