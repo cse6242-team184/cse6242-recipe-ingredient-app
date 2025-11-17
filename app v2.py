@@ -60,7 +60,7 @@ def load_data(url):
     df = pd.read_csv(
         url,
         sep='\t',
-        quoting=csv.QUOTE_NONE
+        quoting=csv.QUOTE_NONE,
         usecols=selected_columns, # Only load columns we need
         low_memory=False,
         on_bad_lines='skip' # Handles potential multiline issues
@@ -315,5 +315,6 @@ if st.button('Submit'):
 # show graphs comparing them
 
  
+
 
 
