@@ -3,13 +3,6 @@ import pandas as pd
 from recipe_scrapers import scrape_me
 from ingredient_parser import parse_ingredient
  
-#import pyspark
- 
-#from pyspark.sql import DataFrame, SparkSession, SQLContext
-from typing import List
-#import pyspark.sql.types as T
-#import pyspark.sql.functions as F
-#from pyspark.sql.functions import lit
 import time
 
 url = "https://github.com/jordanavery92-javery3/cse6242-recipe-ingredient-app/releases/download/v1.0/en.openfoodfacts.org.products.tsv"
@@ -321,3 +314,4 @@ if st.button('Submit'):
 # show graphs comparing them
 
  
+
