@@ -3,6 +3,7 @@ import pandas as pd
 import altair as alt
 import time
 import csv
+import re
 from recipe_scrapers import scrape_me
 from ingredient_parser import parse_ingredient
 
@@ -44,116 +45,75 @@ url = "https://github.com/jordanavery92-javery3/cse6242-recipe-ingredient-app/re
 # sc = pyspark.SparkContext(appName="HW3-Q1")
 # sqlContext = SQLContext(sc)
 
- # No more pyspark, findspark, or os.environ imports needed!
-
 @st.cache_data
 def load_data(url):
-    # Simulate a long-running data loading process
-    time.sleep(2)
-    
-    # Define columns to keep to save memory
-    selected_columns = ['product_name', 'url', 'nutrition_grade_fr', 'ingredients_text', 'fat_100g',
-                        'proteins_100g', 'carbohydrates_100g', 'sugars_100g', 'sodium_100g',
-                        'fiber_100g', 'additives_n', 'countries']
-    
-    # Read with Pandas instead of Spark
-    df = pd.read_csv(
-        url,
-        sep='\t',
-        quoting=csv.QUOTE_NONE,
-        usecols=selected_columns, # Only load columns we need
-        low_memory=False,
-        on_bad_lines='skip' # Handles potential multiline issues
-    )
+    # 1. Load a manageable chunk of data (Fixes "Oh no" crash)
+    # Increasing nrows=30000 might hit the memory limit, testing required.
+    try:
+        df = pd.read_csv(
+            url,
+            sep='\t',
+            quoting=csv.QUOTE_NONE,
+            usecols=['product_name', 'ingredients_text', 'nutrition_grade_fr', 'fat_100g',
+                     'proteins_100g', 'carbohydrates_100g', 'sugars_100g', 'sodium_100g',
+                     'fiber_100g', 'countries'],
+            low_memory=False,
+            on_bad_lines='skip',
+            nrows=30000  # <--- CRITICAL FIX: Limit rows to fit in RAM
+        )
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return pd.DataFrame()
 
-    # Filter with Pandas
-    filtered_df = df[df['product_name'].notna()].copy()
+    # 2. Basic cleanup
+    df = df[df['product_name'].notna()]
+    df = df[df['countries'].str.contains('United States', na=False, case=False)]
     
-    # US only (make sure to handle NaNs in string operations)
-    filtered_df = filtered_df[filtered_df['countries'].str.contains('United States', na=False)]
+    # Ensure ingredients are strings and uppercase for searching
+    df['ingredients_text'] = df['ingredients_text'].astype(str).str.upper()
+
+    # 3. Fast Vectorized Allergen Detection (Replaces the slow loop)
+    # This logic runs in milliseconds instead of minutes.
     
-    ### Add allergy columns to food dataset:
-    
-    #https://www.foodallergy.org/living-food-allergies/food-allergy-essentials/common-allergens
-    
-    milk = ["milk", "butter", "casein", "cheese",
-            "cream", "curd", "custard", "ghee",
-            "half-and-half", "lactose", "lactulose", "whey", "tagatose", "yogurt"]
-    
-    egg = ["egg", "Albumin", "Albumen", "Apovitellin", "Avidin globulin", "Lysozyme", "Mayonnaise",
-            "Meringue", "Ovalbumin", "Ovomucoid", "Ovomucin", "Ovovitellin", "Surimi", "Vitellin"]
-    
-    peanut = ["peanut", "Arachis oil", "Artificial nuts", "Beer nuts", "Ground nuts", "Lupin",
-                "Lupine", "Mandelonas", "Mixed nuts", "Monkey nuts", "Nut meat", "nut meal", "Nut pieces", "nut"]
-    
-    soy = ["soy", "edamame", "miso", "natto", "okara", "Shoyu", "Soya", "Tamari",
-            "Tempeh", "Textured vegetable protein", "TVP", "tofu"]
-    
-    wheat = ["Bread crumbs", "Bulgur", "Cereal extract",
-            "Couscous", "Cracker meal", "Durum", "Einkorn", "Emmer",
-            "Farina", "Farro", "Flour", "Freekeh", "Hydrolyzed wheat protein",
-            "Matzoh", "matzo", "matzah", "matza", "Pasta", "Seitan", "Semolina",
-            "Spelt", "Triticale", "Vital wheat gluten", "Wheat"]
-    
-    treenut = ["tree nut", "Almond", "nut", "Cashew", "Filbert", "Gianduja", "Litchi", "lichee",
-    "lychee", "Macadamia","Marzipan", "walnut", "Pecan", "Pesto", "Pili nut",
-    "Pine nut", "Pistachio", "Praline", "Shea nut"]
-    
-    shellfish = ["shellfish", "Barnacle", "Crab", "Crawfish", "crawdad", "crayfish",
-                "ecrevisse", "Krill", "Lobster", "langouste", "langoustine",
-                "Moreton bay bugs", "scampi", "tomalley", "Prawns", "Shrimp"]
-    
-    fish = ["fish", "Anchovies", "Bass", "Catfish", "Cod", "Flounder", "Grouper", "Haddock",
-            "Hake", "Halibut", "Herring", "Mahi mahi", "Perch", "Pike", "Pollock",
-            "Salmon", "Scrod", "Sole", "Snapper", "Swordfish", "Tilapia", "Trout", "Tuna"]
-    
-    sesame = ["sesame", "Benne", "benniseed", "Gingelly",
-                "gingelly oil", "Gomasio", "Halvah", "Sesamol", "Sesamum indicum",
-                "Sesemolina", "Sim sim", "Tahini", "Tahina", "Tehina", "Til"]
-    
-    # Add columns (Pandas-style)
-    filtered_df["Contains_Milk"] = 0
-    filtered_df["Contains_Egg"] = 0
-    filtered_df["Contains_Peanut"] = 0
-    filtered_df["Contains_Soy"] = 0
-    filtered_df["Contains_Wheat"] = 0
-    filtered_df["Contains_Treenut"] = 0
-    filtered_df["Contains_Shellfish"] = 0
-    filtered_df["Contains_Fish"] = 0
-    filtered_df["Contains_Sesame"] = 0
-    
-    # This loop is already Pandas-based and correct
-    for idx, row in filtered_df.iterrows():
-        ingredients = row['ingredients_text']
-        for item in milk:
-            if item.upper() in str(ingredients).upper().replace("COCONUT MILK", "").replace("ALMOND MILK", "").replace("OAT MILK", "").replace("SOY MILK", ""):
-                filtered_df.loc[idx, 'Contains_Milk'] = 1
-        for item in egg:
-            if item.upper() in str(ingredients).upper():
-                filtered_df.loc[idx, 'Contains_Egg'] = 1
-        for item in peanut:
-            if item.upper() in str(ingredients).upper().replace("COCONUT", ""):
-                filtered_df.loc[idx, 'Contains_Peanut'] = 1
-        for item in soy:
-            if item.upper() in str(ingredients).upper():
-                filtered_df.loc[idx, 'Contains_Soy'] = 1
-        for item in wheat:
-            if item.upper() in str(ingredients).upper().replace("ALMOND FLOUR", "").replace("CHICKPEA FLOUR", "").replace("COCONUT FLOUR", ""):
-                filtered_df.loc[idx, 'Contains_Wheat'] = 1
-        for item in treenut:
-            if item.upper() in str(ingredients).upper().replace("COCONUT", ""):
-                filtered_df.loc[idx, 'Contains_Treenut'] = 1
-        for item in shellfish:
-            if item.upper() in str(ingredients).upper():
-                filtered_df.loc[idx, 'Contains_Shellfish'] = 1
-        for item in fish:
-            if item.upper() in str(ingredients).upper():
-                filtered_df.loc[idx, 'Contains_Fish'] = 1
-        for item in sesame:
-            if item.upper() in str(ingredients).upper():
-                filtered_df.loc[idx, 'Contains_Sesame'] = 1
-    
-    return filtered_df
+    def tag_allergen(df, col_name, allergens, exclusions=[]):
+        # Create a temporary working column
+        temp_ing = df['ingredients_text']
+        
+        # Remove exclusions (e.g., remove "COCONUT MILK" before checking for "MILK")
+        for excl in exclusions:
+            temp_ing = temp_ing.str.replace(excl.upper(), "", regex=False)
+        
+        # Join all allergens into a single search pattern: "MILK|BUTTER|CHEESE"
+        # re.escape ensures special characters like "half-and-half" don't break regex
+        pattern = '|'.join([re.escape(x.upper()) for x in allergens])
+        
+        # Check efficiently
+        df[col_name] = temp_ing.str.contains(pattern, regex=True).astype(int)
+        return df
+
+    # Define your lists (copied from your code)
+    milk = ["milk", "butter", "casein", "cheese", "cream", "curd", "custard", "ghee", "half-and-half", "lactose", "lactulose", "whey", "tagatose", "yogurt"]
+    egg = ["egg", "Albumin", "Albumen", "Apovitellin", "Avidin globulin", "Lysozyme", "Mayonnaise", "Meringue", "Ovalbumin", "Ovomucoid", "Ovomucin", "Ovovitellin", "Surimi", "Vitellin"]
+    peanut = ["peanut", "Arachis oil", "Artificial nuts", "Beer nuts", "Ground nuts", "Lupin", "Lupine", "Mandelonas", "Mixed nuts", "Monkey nuts", "Nut meat", "nut meal", "Nut pieces", "nut"]
+    soy = ["soy", "edamame", "miso", "natto", "okara", "Shoyu", "Soya", "Tamari", "Tempeh", "Textured vegetable protein", "TVP", "tofu"]
+    wheat = ["Bread crumbs", "Bulgur", "Cereal extract", "Couscous", "Cracker meal", "Durum", "Einkorn", "Emmer", "Farina", "Farro", "Flour", "Freekeh", "Hydrolyzed wheat protein", "Matzoh", "matzo", "matzah", "matza", "Pasta", "Seitan", "Semolina", "Spelt", "Triticale", "Vital wheat gluten", "Wheat"]
+    treenut = ["tree nut", "Almond", "nut", "Cashew", "Filbert", "Gianduja", "Litchi", "lichee", "lychee", "Macadamia","Marzipan", "walnut", "Pecan", "Pesto", "Pili nut", "Pine nut", "Pistachio", "Praline", "Shea nut"]
+    shellfish = ["shellfish", "Barnacle", "Crab", "Crawfish", "crawdad", "crayfish", "ecrevisse", "Krill", "Lobster", "langouste", "langoustine", "Moreton bay bugs", "scampi", "tomalley", "Prawns", "Shrimp"]
+    fish = ["fish", "Anchovies", "Bass", "Catfish", "Cod", "Flounder", "Grouper", "Haddock", "Hake", "Halibut", "Herring", "Mahi mahi", "Perch", "Pike", "Pollock", "Salmon", "Scrod", "Sole", "Snapper", "Swordfish", "Tilapia", "Trout", "Tuna"]
+    sesame = ["sesame", "Benne", "benniseed", "Gingelly", "gingelly oil", "Gomasio", "Halvah", "Sesamol", "Sesamum indicum", "Sesemolina", "Sim sim", "Tahini", "Tahina", "Tehina", "Til"]
+
+    # Apply the fast tagging
+    df = tag_allergen(df, 'Contains_Milk', milk, exclusions=["COCONUT MILK", "ALMOND MILK", "OAT MILK", "SOY MILK"])
+    df = tag_allergen(df, 'Contains_Egg', egg)
+    df = tag_allergen(df, 'Contains_Peanut', peanut, exclusions=["COCONUT"])
+    df = tag_allergen(df, 'Contains_Soy', soy)
+    df = tag_allergen(df, 'Contains_Wheat', wheat, exclusions=["ALMOND FLOUR", "CHICKPEA FLOUR", "COCONUT FLOUR"])
+    df = tag_allergen(df, 'Contains_Treenut', treenut, exclusions=["COCONUT"])
+    df = tag_allergen(df, 'Contains_Shellfish', shellfish)
+    df = tag_allergen(df, 'Contains_Fish', fish)
+    df = tag_allergen(df, 'Contains_Sesame', sesame)
+
+    return df
 
 
 st.set_page_config(
@@ -315,6 +275,7 @@ if st.button('Submit'):
 # show graphs comparing them
 
  
+
 
 
 
