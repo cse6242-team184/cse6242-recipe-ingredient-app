@@ -1,0 +1,5 @@
+streamlit
+pandas
+recipe-scrapers
+ingredient-parser
+altair
