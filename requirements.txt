@@ -3,3 +3,4 @@ pandas
 recipe-scrapers
 ingredient-parser-nlp
 altair
+scikit-learn
