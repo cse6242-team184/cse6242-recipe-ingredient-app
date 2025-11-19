@@ -117,13 +117,13 @@ def load_data(url):
 
 
 st.set_page_config(
-    page_title="Ingredients App",
+    page_title="SmartSwitch Planner",
     layout="centered",
     initial_sidebar_state="auto"
 )
  
 # Add a title to your app
-st.title("Welcome to the Ingredients App!")
+st.title("Welcome to the SmartSwitch Planner!")
  
 # Add some text
 st.write("Select a recipe below to get started.")
@@ -275,6 +275,7 @@ if st.button('Submit'):
 # show graphs comparing them
 
  
+
 
 
 
