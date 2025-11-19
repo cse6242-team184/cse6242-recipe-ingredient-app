@@ -2,57 +2,11 @@ import streamlit as st
 import pandas as pd
 from recipe_scrapers import scrape_me
 from ingredient_parser import parse_ingredient
- 
-import pyspark
- 
-from pyspark.sql import DataFrame, SparkSession, SQLContext
-from typing import List
-import pyspark.sql.types as T
-import pyspark.sql.functions as F
-from pyspark.sql.functions import lit
 import time
 import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-
- 
-
-# !apt-get install openjdk-8-jdk-headless -qq > /dev/null
-# #Check this site for the latest download link https://www.apache.org/dyn/closer.lua/spark/spark-3.2.1/spark-3.2.1-bin-hadoop3.2.tgz
-# !wget -q https://dlcdn.apache.org/spark/spark-3.2.1/spark-3.2.1-bin-hadoop3.2.tgz
-# !tar xf spark-3.2.1-bin-hadoop3.2.tgz
-# !pip install -q findspark
-# !pip install pyspark
-# !pip install py4j
-
-# import os
-# # import sys
-# os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
-# # os.environ["SPARK_HOME"] = "/content/spark-3.2.1-bin-hadoop3.2"
-
-
-# import findspark
-# findspark.init()
-# findspark.find()
-
-# import pyspark
-
-# from pyspark.sql import DataFrame, SparkSession
-# from typing import List
-# import pyspark.sql.types as T
-# import pyspark.sql.functions as F
-
-spark= SparkSession \
-       .builder \
-       .appName("Our First Spark Example") \
-       .getOrCreate()
- 
-#  sc = pyspark.SparkContext(appName="HW3-Q1")
-#Get Data:
-
-# sc = pyspark.SparkContext(appName="HW3-Q1")
-# sqlContext = SQLContext(sc)
 
 
 def clean_text(text):
@@ -219,30 +173,28 @@ def match_ingredient_to_products(ingredient, df, top_n=50):
 def load_data(file_path):
     # Simulate a long-running data loading process
     time.sleep(2)
-    df = spark.read.csv(
-        file_path,
-        header=True,
-        inferSchema=True,
-        multiLine=True,
-        escape='"',
-        sep='\t'
-    )
-
-    df = df.filter(F.lower("product_name").isNotNull())
     
+    # Read CSV with pandas
+    df = pd.read_csv(
+        file_path,
+        sep='\t',
+        encoding='utf-8',
+        low_memory=False
+    )
+    
+    # Filter out rows where product_name is null
+    df = df[df['product_name'].notna()]
     
     # Create a new dataframe with a subset of columns
     selected_columns = ['product_name', 'url', 'nutrition_grade_fr', 'ingredients_text', 'fat_100g',
                         'proteins_100g', 'carbohydrates_100g', 'sugars_100g', 'sodium_100g',
-                        'fiber_100g', 'additives_n', 'countries'] # Replace with the list of columns you want to keep
+                        'fiber_100g', 'additives_n', 'countries']
     
-    filtered_df = df[[selected_columns]]
-
-    #filtered_df = df.dropna(subset=selected_columns)
- 
+    filtered_df = df[selected_columns].copy()
     
-    #US only:
-    filtered_df = filtered_df[filtered_df['countries'].contains('United States')]
+    # US only: filter for products available in United States
+    filtered_df = filtered_df[filtered_df['countries'].fillna('').str.contains('United States', case=False, na=False)]
+    
     ### Add allergy columns to food dataset:
     
     #https://www.foodallergy.org/living-food-allergies/food-allergy-essentials/common-allergens
@@ -282,19 +234,18 @@ def load_data(file_path):
               "gingelly oil", "Gomasio", "Halvah", "Sesamol", "Sesamum indicum",
               "Sesemolina", "Sim sim", "Tahini", "Tahina", "Tehina", "Til"]
     
-    filtered_df = filtered_df.withColumn("Contains_Milk", lit(0))
-    filtered_df = filtered_df.withColumn("Contains_Egg", lit(0))
-    filtered_df = filtered_df.withColumn("Contains_Peanut", lit(0))
-    filtered_df = filtered_df.withColumn("Contains_Soy", lit(0))
-    filtered_df = filtered_df.withColumn("Contains_Wheat", lit(0))
-    filtered_df = filtered_df.withColumn("Contains_Treenut", lit(0))
-    filtered_df = filtered_df.withColumn("Contains_Shellfish", lit(0))
-    filtered_df = filtered_df.withColumn("Contains_Fish", lit(0))
-    filtered_df = filtered_df.withColumn("Contains_Sesame", lit(0))
+    # Initialize allergen columns
+    filtered_df['Contains_Milk'] = 0
+    filtered_df['Contains_Egg'] = 0
+    filtered_df['Contains_Peanut'] = 0
+    filtered_df['Contains_Soy'] = 0
+    filtered_df['Contains_Wheat'] = 0
+    filtered_df['Contains_Treenut'] = 0
+    filtered_df['Contains_Shellfish'] = 0
+    filtered_df['Contains_Fish'] = 0
+    filtered_df['Contains_Sesame'] = 0
     
-    
-    filtered_df = filtered_df.toPandas()
-    
+    # Detect allergens in ingredients
     for idx, row in filtered_df.iterrows():
         ingredients = row['ingredients_text']
         for item in milk:
@@ -324,9 +275,6 @@ def load_data(file_path):
         for item in sesame:
             if item.upper() in str(ingredients).upper():
                 filtered_df.loc[idx, 'Contains_Sesame'] = 1
-    
-    #filtered_df = spark.createDataFrame(filtered_df)
-
 
     return filtered_df
 
