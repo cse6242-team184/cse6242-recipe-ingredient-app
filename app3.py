@@ -172,34 +172,16 @@ def match_ingredient_to_products(ingredient, df, top_n=50):
  
 @st.cache_data
 def load_data(file_path):
-    # Simulate a long-running data loading process
-    time.sleep(2)
-    
-    # Read CSV with pandas
-    df = pd.read_csv(
-        file_path,
-        sep='\t',
-        encoding='utf-8',
-        low_memory=False
-    )
-    
-    # Filter out rows where product_name is null
-    df = df[df['product_name'].notna()]
-    
-    # Create a new dataframe with a subset of columns
+    """
+    Load data in chunks to avoid memory issues with large files.
+    Only keeps US products with valid product names to minimize memory usage.
+    """
+    # Define columns we need
     selected_columns = ['product_name', 'url', 'nutrition_grade_fr', 'ingredients_text', 'fat_100g',
                         'proteins_100g', 'carbohydrates_100g', 'sugars_100g', 'sodium_100g',
                         'fiber_100g', 'additives_n', 'countries']
     
-    filtered_df = df[selected_columns].copy()
-    
-    # US only: filter for products available in United States
-    filtered_df = filtered_df[filtered_df['countries'].fillna('').str.contains('United States', case=False, na=False)]
-    
-    ### Add allergy columns to food dataset:
-    
-    #https://www.foodallergy.org/living-food-allergies/food-allergy-essentials/common-allergens
-    
+    # Define allergen lists
     milk = ["milk", "butter", "casein", "cheese",
             "cream", "curd", "custard", "ghee",
             "half-and-half", "lactose", "lactulose", "whey", "tagatose", "yogurt"]
@@ -235,47 +217,77 @@ def load_data(file_path):
               "gingelly oil", "Gomasio", "Halvah", "Sesamol", "Sesamum indicum",
               "Sesemolina", "Sim sim", "Tahini", "Tahina", "Tehina", "Til"]
     
-    # Initialize allergen columns
-    filtered_df['Contains_Milk'] = 0
-    filtered_df['Contains_Egg'] = 0
-    filtered_df['Contains_Peanut'] = 0
-    filtered_df['Contains_Soy'] = 0
-    filtered_df['Contains_Wheat'] = 0
-    filtered_df['Contains_Treenut'] = 0
-    filtered_df['Contains_Shellfish'] = 0
-    filtered_df['Contains_Fish'] = 0
-    filtered_df['Contains_Sesame'] = 0
+    # Helper function to detect allergens
+    def detect_allergen(ingredients_str, allergen_list):
+        if pd.isna(ingredients_str):
+            return 0
+        ingredients_upper = str(ingredients_str).upper()
+        return int(any(item.upper() in ingredients_upper for item in allergen_list))
     
-    # Detect allergens in ingredients
-    for idx, row in filtered_df.iterrows():
-        ingredients = row['ingredients_text']
-        for item in milk:
-            if item.upper() in str(ingredients).upper().replace("COCONUT MILK", "").replace("ALMOND MILK", "").replace("OAT MILK", "").replace("SOY MILK", ""):
-                filtered_df.loc[idx, 'Contains_Milk'] = 1
-        for item in egg:
-            if item.upper() in str(ingredients).upper():
-                filtered_df.loc[idx, 'Contains_Egg'] = 1
-        for item in peanut:
-            if item.upper() in str(ingredients).upper().replace("COCONUT", ""):
-                filtered_df.loc[idx, 'Contains_Peanut'] = 1
-        for item in soy:
-            if item.upper() in str(ingredients).upper():
-                filtered_df.loc[idx, 'Contains_Soy'] = 1
-        for item in wheat:
-            if item.upper() in str(ingredients).upper().replace("ALMOND FLOUR", "").replace("CHICKPEA FLOUR", "").replace("COCONUT FLOUR", ""):
-                filtered_df.loc[idx, 'Contains_Wheat'] = 1
-        for item in treenut:
-            if item.upper() in str(ingredients).upper().replace("COCONUT", ""):
-                filtered_df.loc[idx, 'Contains_Treenut'] = 1
-        for item in shellfish:
-            if item.upper() in str(ingredients).upper():
-                filtered_df.loc[idx, 'Contains_Shellfish'] = 1
-        for item in fish:
-            if item.upper() in str(ingredients).upper():
-                filtered_df.loc[idx, 'Contains_Fish'] = 1
-        for item in sesame:
-            if item.upper() in str(ingredients).upper():
-                filtered_df.loc[idx, 'Contains_Sesame'] = 1
+    # Read file in chunks and filter
+    chunk_list = []
+    chunk_size = 50000  # Process 50k rows at a time
+    
+    with pd.read_csv(file_path, sep='\t', encoding='utf-8', 
+                     chunksize=chunk_size, usecols=selected_columns,
+                     on_bad_lines='skip') as reader:
+        
+        for chunk in reader:
+            # Filter: product_name must exist
+            chunk = chunk[chunk['product_name'].notna()]
+            
+            # Filter: US only
+            chunk = chunk[chunk['countries'].fillna('').str.contains('United States', case=False, na=False)]
+            
+            # Only keep this chunk if it has data
+            if len(chunk) > 0:
+                chunk_list.append(chunk)
+    
+    # Combine all filtered chunks
+    if not chunk_list:
+        st.error("No US products found in the dataset!")
+        return pd.DataFrame()
+    
+    filtered_df = pd.concat(chunk_list, ignore_index=True)
+    
+    # Now detect allergens on the filtered dataset (much smaller than original)
+    ingredients_upper = filtered_df['ingredients_text'].fillna('').str.upper()
+    
+    # Milk detection (exclude plant-based milks)
+    milk_clean = ingredients_upper.str.replace("COCONUT MILK", "", regex=False)\
+                                   .str.replace("ALMOND MILK", "", regex=False)\
+                                   .str.replace("OAT MILK", "", regex=False)\
+                                   .str.replace("SOY MILK", "", regex=False)
+    filtered_df['Contains_Milk'] = milk_clean.apply(lambda x: detect_allergen(x, milk))
+    
+    # Egg detection
+    filtered_df['Contains_Egg'] = ingredients_upper.apply(lambda x: detect_allergen(x, egg))
+    
+    # Peanut detection (exclude coconut)
+    peanut_clean = ingredients_upper.str.replace("COCONUT", "", regex=False)
+    filtered_df['Contains_Peanut'] = peanut_clean.apply(lambda x: detect_allergen(x, peanut))
+    
+    # Soy detection
+    filtered_df['Contains_Soy'] = ingredients_upper.apply(lambda x: detect_allergen(x, soy))
+    
+    # Wheat detection (exclude alternative flours)
+    wheat_clean = ingredients_upper.str.replace("ALMOND FLOUR", "", regex=False)\
+                                    .str.replace("CHICKPEA FLOUR", "", regex=False)\
+                                    .str.replace("COCONUT FLOUR", "", regex=False)
+    filtered_df['Contains_Wheat'] = wheat_clean.apply(lambda x: detect_allergen(x, wheat))
+    
+    # Tree nut detection (exclude coconut)
+    treenut_clean = ingredients_upper.str.replace("COCONUT", "", regex=False)
+    filtered_df['Contains_Treenut'] = treenut_clean.apply(lambda x: detect_allergen(x, treenut))
+    
+    # Shellfish detection
+    filtered_df['Contains_Shellfish'] = ingredients_upper.apply(lambda x: detect_allergen(x, shellfish))
+    
+    # Fish detection
+    filtered_df['Contains_Fish'] = ingredients_upper.apply(lambda x: detect_allergen(x, fish))
+    
+    # Sesame detection
+    filtered_df['Contains_Sesame'] = ingredients_upper.apply(lambda x: detect_allergen(x, sesame))
 
     return filtered_df
 
