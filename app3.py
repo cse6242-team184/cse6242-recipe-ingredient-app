@@ -596,7 +596,7 @@ else:
 if submit_button and selected_ingredient:
     
     with st.spinner('🔄 Analyzing products and applying your preferences...'):
-        file_path = './en.openfoodfacts.org.products.tsv'
+        file_path = 'https://github.com/jordanavery92-javery3/cse6242-recipe-ingredient-app/releases/download/v1.0/en.openfoodfacts.org.products.tsv'
         df = load_data(file_path)
         #df = spark.createDataFrame(df)
 
@@ -889,3 +889,4 @@ st.markdown("""
 # sort based on preferences and show top 3 best options 
 
 # show graphs comparing them
+
