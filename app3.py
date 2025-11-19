@@ -176,7 +176,7 @@ def load_data(file_path):
     
     try:
         df = pd.read_csv(
-            url,
+            file_path,
             sep='\t',
             quoting=csv.QUOTE_NONE,
             usecols=['product_name', 'ingredients_text', 'nutrition_grade_fr', 'fat_100g',
@@ -897,5 +897,6 @@ st.markdown("""
 # sort based on preferences and show top 3 best options 
 
 # show graphs comparing them
+
 
 
