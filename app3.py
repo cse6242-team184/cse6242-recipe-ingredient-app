@@ -174,13 +174,21 @@ def load_data(file_path):
     # Simulate a long-running data loading process
     time.sleep(2)
     
-    # Read CSV with pandas
-    df = pd.read_csv(
-        file_path,
-        sep='\t',
-        encoding='utf-8',
-        low_memory=False
-    )
+    try:
+        df = pd.read_csv(
+            url,
+            sep='\t',
+            quoting=csv.QUOTE_NONE,
+            usecols=['product_name', 'ingredients_text', 'nutrition_grade_fr', 'fat_100g',
+                     'proteins_100g', 'carbohydrates_100g', 'sugars_100g', 'sodium_100g',
+                     'fiber_100g', 'countries'],
+            low_memory=False,
+            on_bad_lines='skip',
+            nrows=30000  # <--- CRITICAL FIX: Limit rows to fit in RAM
+        )
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return pd.DataFrame()
     
     # Filter out rows where product_name is null
     df = df[df['product_name'].notna()]
@@ -889,4 +897,5 @@ st.markdown("""
 # sort based on preferences and show top 3 best options 
 
 # show graphs comparing them
+
 
