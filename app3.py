@@ -280,7 +280,7 @@ def load_data(file_path):
 
 
 st.set_page_config(
-    page_title="Smart Recipe & Ingredient Finder",
+    page_title="SmartSwitch Planner: Smart Recipe & Ingredient Finder",
     layout="wide",
     initial_sidebar_state="expanded",
     page_icon="🍳"
@@ -432,7 +432,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
  
 # Add a title to your app
-st.markdown('<h1 class="stTitle">🍳 Smart Recipe & Ingredient Finder</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="stTitle">🍳 SmartSwitch Planner: Smart Recipe & Ingredient Finder</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Discover healthier ingredient alternatives tailored to your dietary needs!</p>', unsafe_allow_html=True)
 
 # Add divider
@@ -887,4 +887,5 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 # sort based on preferences and show top 3 best options 
+
 # show graphs comparing them
