@@ -1,8 +1,10 @@
 # cse6242-recipe-ingredient-app  
-CSE6242 Group Project  
-DESCRIPTION - This code establishes a Streamlit web application called "SmartSwitch Planner" that helps users find specific commercial food products that match ingredients from online recipes while adhering to dietary restrictions. Initially, the script scrapes a curated list of recipe URLs using recipe_scrapers, parses the raw text into structured data (ingredient names, quantities, and units), and presents them to the user. The interface allows users to select a recipe, specify allergens to exclude (such as peanuts, dairy, or gluten), and define nutritional priorities like "Low Sugar" or "High Protein."  
+**CSE6242 Group Project**  
+**DESCRIPTION** - This code establishes a Streamlit web application called "SmartSwitch Planner" that helps users find specific commercial food products that match ingredients from online recipes while adhering to dietary restrictions. Initially, the script scrapes a curated list of recipe URLs using recipe_scrapers, parses the raw text into structured data (ingredient names, quantities, and units), and presents them to the user. The interface allows users to select a recipe, specify allergens to exclude (such as peanuts, dairy, or gluten), and define nutritional priorities like "Low Sugar" or "High Protein."  
 Behind the scenes, the application loads a large dataset from Open Food Facts in chunks to manage memory, filtering specifically for US products and flagging them for common allergens. When a user selects an ingredient, the code employs a hybrid matching algorithm that combines rule-based token matching (checking for exact words and word positioning) with TF-IDF cosine similarity (a machine learning technique) to find the most relevant commercial products. The app then filters these results based on the user's allergy constraints, ranks them according to their selected health goals, and visualizes the top three matches with nutritional comparison charts and "quick insight" badges.  
 
-INSTALLATION - The application is available as a streamlit app, no need to run locally. The data is available in the file and also online at https://github.com/jordanavery92-javery3/cse6242-recipe-ingredient-app/releases/download/v1.0/en.openfoodfacts.org.products.tsv so the Streamlit app can access. All the code is also available in GitHub HERE.  
-EXECUTION - To access the dashboard, go to https://cse6242-smartswitch-planner-public.streamlit.app/  
-DEMO - https://youtu.be/LPQB_wInsU4  
+**INSTALLATION** - The application is available as a streamlit app, no need to run locally. The data is available in the file and also online at https://github.com/jordanavery92-javery3/cse6242-recipe-ingredient-app/releases/download/v1.0/en.openfoodfacts.org.products.tsv so the Streamlit app can access. All the code is also available in GitHub HERE.  
+
+**EXECUTION** - To access the dashboard, go to https://cse6242-smartswitch-planner-public.streamlit.app/  
+
+**DEMO** - https://youtu.be/LPQB_wInsU4  
